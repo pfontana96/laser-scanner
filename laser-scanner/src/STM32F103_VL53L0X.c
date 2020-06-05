@@ -7,7 +7,7 @@
 
 #include "STM32F103_VL53L0X.h"
 
-#define VL53L0X_LOG_INFO
+//#define VL53L0X_LOG_INFO
 //#define VL53L0X_LONG_RANGE
 //#define VL53L0X_PERFORM_CALIBRATION
 
@@ -19,7 +19,7 @@ uint8_t isApertureSpads;
 uint8_t VhvSettings;
 uint8_t PhaseCal;
 #else
-// Stored values after calibration
+// Stored values after calibration (taken from ST forum as RefSpadCalibration returns always -50
 uint32_t refSpadCount = 3;
 uint8_t isApertureSpads = 1;
 uint8_t VhvSettings = 31;
@@ -222,15 +222,51 @@ VL53L0X_Error VL53L0XGetSingleMeasure(VL53L0X_Dev_t *pMyDevice, uint16_t *measur
 	VL53L0X_Error Status = VL53L0X_ERROR_NONE;
 	char rangeStatusStr[VL53L0X_MAX_STRING_LENGTH];
 
-	Status = VL53L0X_PerformSingleRangingMeasurement(pMyDevice,
-    		&RangingMeasurementData);
+//	UART2puts ("Call of VL53L0X_StartMeasurement\r\n\t");
+	Status = VL53L0X_StartMeasurement(pMyDevice);
+//	print_pal_error(Status);
 
-	*measure = RangingMeasurementData.RangeMilliMeter;
+//	UART2puts ("Call of VL53L0X_WaitMeasurementDataReady\r\n\t");
+	Status = WaitMeasurementDataReady(pMyDevice);
+//	print_pal_error(Status);
 
+	if(Status == VL53L0X_ERROR_NONE)
+	{
+
+	   Status = VL53L0X_GetRangingMeasurementData(pMyDevice, &RangingMeasurementData);
+	   if((RangingMeasurementData.RangeStatus == 0 || RangingMeasurementData.RangeStatus == 1) &&
+		   Status == VL53L0X_ERROR_NONE)
+	   {
+		   *measure = RangingMeasurementData.RangeMilliMeter;
+	   }
+	   else
+	   {
+		   *measure = -1;	// Value for non valid measures
+	   }
 #ifdef VL53L0X_LOG_INFO
-	VL53L0X_GetRangeStatusString(RangingMeasurementData.RangeStatus, rangeStatusStr);
-	sprintf(UART_buffer, "Measure: %d mm (%s)\r\n", *measure, rangeStatusStr);
+		VL53L0X_GetRangeStatusString(RangingMeasurementData.RangeStatus, rangeStatusStr);
+		sprintf(UART_buffer, "Measure: %d mm (%s)\r\n", *measure, rangeStatusStr);
+		UART2puts(UART_buffer);
 #endif
+		// Clear the interrupt
+	   VL53L0X_ClearInterruptMask(pMyDevice, VL53L0X_REG_SYSTEM_INTERRUPT_GPIO_NEW_SAMPLE_READY);
+	   VL53L0X_PollingDelay(pMyDevice);
+	}
+
+//	UART2puts ("Call of VL53L0X_StopMeasurement\r\n\t");
+	Status = VL53L0X_StopMeasurement(pMyDevice);
+//	print_pal_error(Status);
+
+//	UART2puts ("Wait Stop to be competed\r\n\t");
+	Status = WaitStopCompleted(pMyDevice);
+//	print_pal_error(Status);
+
+//	UART2puts("Clear Interrupt Mask\r\n\t");
+	Status = VL53L0X_ClearInterruptMask(pMyDevice,
+			VL53L0X_REG_SYSTEM_INTERRUPT_GPIO_NEW_SAMPLE_READY);
+//	print_pal_error(Status);
+
+   VL53L0X_PollingDelay(pMyDevice);
 
 	return Status;
 }

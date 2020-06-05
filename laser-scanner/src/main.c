@@ -32,6 +32,7 @@ SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <math.h>
 
 
 #include "stm32f10x.h"
@@ -50,6 +51,8 @@ SOFTWARE.
 
 
 /* Private typedef */
+typedef enum STATE {IDLE, MEASURING, INIT}state_t;
+
 /* Private define  */
 #define USE_CHRONO
 
@@ -61,12 +64,9 @@ SOFTWARE.
 
 /* Private macro */
 /* Private variables */
- USART_InitTypeDef USART_InitStructure;
- char UART_buffer[200];
- volatile bool print = false, changePos = false;
- float angles[] = {-90.0f, -75.0f, 0.0f, 75.0f, 90.0f};
- volatile float angle = 0.0, deltaTheta = 1.0f;
- volatile int i = 0;
+char UART_buffer[200];
+float angle_base = -90.0f, delta_base = 1.0f, angle_top = -50.0f, delta_top = 1.0f;
+state_t state = IDLE;
 
 /* Private function prototypes */
 /* Private functions */
@@ -106,13 +106,6 @@ int main(void)
   SysTick_Config(SystemCoreClock / 1000000);
 #endif
   initLED();
-
-  //  timerInit(2, 7200, 10000); // 72 MHz / 7200 = 10000 Hz / 10000 = 1 Hz
-  timerInit(2, 7200, 250); // 72 MHz / 21600
-  timerInterruptEnable(2, TIM_IT_Update);
-
-//  timerInit(3, 400, 3600);
-//  PWM_Init(1, (uint16_t) 270, 1);
 
   ServosInit();
   UART2Init(9600, 0);
@@ -178,57 +171,55 @@ int main(void)
   UART2puts("Call of VL53L0XInit...\r\n");
   if(Status == VL53L0X_ERROR_NONE)
   {
-	  Status = VL53L0XInit(pMyDevice, VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
-	//  Status = VL53L0XInit(pMyDevice, VL53L0X_DEVICEMODE_SINGLE_RANGING);
+//	  Status = VL53L0XInit(pMyDevice, VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
+	  Status = VL53L0XInit(pMyDevice, VL53L0X_DEVICEMODE_SINGLE_RANGING);
 	  print_pal_error(Status);
   }
 
-  uint32_t n = 5;
-  uint16_t measures[n], avg;
-  if( Status ==  VL53L0X_ERROR_NONE)
+//  uint32_t n = NB_OF_MEASURES;
+//  uint16_t measures[n], avg;
+  uint16_t data;
+  float x, y, z;
+
+  ServoSetPos(SERVO_BASE_ID, angle_base);
+  ServoSetPos(SERVO_TOP_ID, angle_top);
+
+  state = WORKING;
+
+  while(true)
   {
-	  for(uint8_t i = 0; i < 4; i++)
+	  ServoSetPos(SERVO_BASE_ID, angle_base);
+
+	  Status = VL53L0XGetSingleMeasure(pMyDevice, &data);
+	  VL53L0X_PollingDelay(pMyDevice);
+
+	  // Message trame MX#Y#Z
+	  x = data * sin(angle_top) * cos(angle_base);
+	  y = data * sin(angle_top) * sin(angle_base);
+	  z = data * cos(angle_top);
+	  sprintf(UART_buffer, "M%.2f#%.2f#%.2f", x, y, z);
+	  UART2puts(UART_buffer);
+
+
+	  angle_base = angle_base + delta_base;
+	  if(abs(angle_base) > 90.0f)
 	  {
-		  sprintf(UART_buffer, "Call of VL53L0XGetMeasures (%i/4)\r\n\t", i);
-		  UART2puts(UART_buffer);
-		  Status = VL53L0XGetMeasures(pMyDevice, measures, &n);
-		  print_pal_error(Status);
+		  delta_base = -delta_base;
+		  angle_base = angle_base + delta_base;
 
-		  avg = 0;
-		  for(uint8_t j = 0; j < n; j++)
+//		  ServoSetPos(SERVO_TOP_ID, angle_top);
+//
+		  angle_top = angle_top + delta_top;
+		  if(abs(angle_top) > 50.0f)
 		  {
-			  avg = avg + measures[j];
+			  delta_top = -delta_top;
+			  angle_top = angle_top + delta_top;
 		  }
-		  avg = (uint16_t) (avg/n);
-		  sprintf(UART_buffer, "Average measure: %d mm\r\n", (int) avg);
-		  UART2puts(UART_buffer);
-
-		  VL53L0X_PollingDelay(pMyDevice);
-		  n = 32;
 	  }
   }
 
   return Status;
 
-}
-
-void TIM2_IRQHandler()
-{
-	if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
-	{
-		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-		toggleLED();
-
-		print = true;
-//		angle = angles[i++];
-		angle = angle + deltaTheta;
-		if(abs(angle) > 90)
-		{
-			deltaTheta = -deltaTheta;
-			angle = angle + deltaTheta;
-		}
-		if(i > 5) i = 0;
-	}
 }
 
 void initLED()

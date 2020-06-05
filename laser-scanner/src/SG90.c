@@ -39,11 +39,11 @@ void ServoSetPos(const uint8_t id, const float angle)
 #endif
 	switch(id)
 	{
-		case 1:
+		case SERVO_BASE_ID:
 //			UART2puts("Servo 1 PWM changed\r\n");
 			SERVO_TIMER->CCR1 = duty_cycles;
 			break;
-		case 2:
+		case SERVO_TOP_ID:
 			SERVO_TIMER->CCR2 = duty_cycles;
 			break;
 	}
