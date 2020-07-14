@@ -65,13 +65,15 @@ typedef enum STATE {IDLE, MEASURING, INIT}state_t;
 /* Private macro */
 /* Private variables */
 char UART_buffer[200];
-float angle_base = -90.0f, delta_base = 1.0f, angle_top = -50.0f, delta_top = 1.0f;
+volatile float angle_base = -90.0f, delta_base = 1.0f, angle_top = -50.0f, delta_top = -2.0f;
+const float angle_base_init = -80.0f, angle_top_init = -70.0f;
 state_t state = IDLE;
 
 /* Private function prototypes */
 /* Private functions */
 void initLED(void);
 void toggleLED(void);
+void updateAngles(void);
 
 /**
 **===========================================================================
@@ -181,45 +183,118 @@ int main(void)
   uint16_t data;
   float x, y, z;
 
-  ServoSetPos(SERVO_BASE_ID, angle_base);
-  ServoSetPos(SERVO_TOP_ID, angle_top);
+  ServoSetPos(SERVO_BASE_ID, 0.0f);
+  ServoSetPos(SERVO_TOP_ID, 0.0f);
+  DelayMs(5);
 
-  state = WORKING;
+  state = INIT;
 
   while(true)
   {
-	  ServoSetPos(SERVO_BASE_ID, angle_base);
-
-	  Status = VL53L0XGetSingleMeasure(pMyDevice, &data);
-	  VL53L0X_PollingDelay(pMyDevice);
-
-	  // Message trame MX#Y#Z
-	  x = data * sin(angle_top) * cos(angle_base);
-	  y = data * sin(angle_top) * sin(angle_base);
-	  z = data * cos(angle_top);
-	  sprintf(UART_buffer, "M%.2f#%.2f#%.2f", x, y, z);
-	  UART2puts(UART_buffer);
-
-
-	  angle_base = angle_base + delta_base;
-	  if(abs(angle_base) > 90.0f)
+	  switch(state)
 	  {
-		  delta_base = -delta_base;
-		  angle_base = angle_base + delta_base;
-
-//		  ServoSetPos(SERVO_TOP_ID, angle_top);
+	  	  case MEASURING:
+			  // Set position
+//			  ServoSetPos(SERVO_BASE_ID, angle_base);
 //
-		  angle_top = angle_top + delta_top;
-		  if(abs(angle_top) > 50.0f)
-		  {
-			  delta_top = -delta_top;
-			  angle_top = angle_top + delta_top;
-		  }
+//			  angle_base = angle_base + delta_base;
+//			  if(abs(angle_base) > 70.0f)
+//			  {
+//				  delta_base = -delta_base;
+//				  angle_base = angle_base + delta_base;
+//
+//				  ServoSetPos(SERVO_TOP_ID, angle_top);
+//
+//				  angle_top = angle_top + delta_top;
+//				  if((angle_top < -70.0f) || (angle_top > 50.0f))
+//				  {
+//					  delta_top = -delta_top;
+//					  angle_top = angle_top + delta_top;
+//				  }
+//			  }
+
+	  		  updateAngles();
+	  		  ServoSetPos(SERVO_BASE_ID, angle_base);
+	  		  DelayMs(1);
+	  		  ServoSetPos(SERVO_TOP_ID, angle_top);
+
+//	  		  sprintf(UART_buffer, "top: %f | base: %f\r\n", angle_top, angle_base);
+//			  UART2puts(UART_buffer);
+
+//			  if(angle_top == -70.0f)
+//				  state = IDLE;
+
+			  Status = VL53L0XGetSingleMeasure(pMyDevice, &data);
+//			  data = 1000;
+			  // VL53L0X_PollingDelay(pMyDevice);
+
+			  if(Status == VL53L0X_ERROR_NONE)
+			  {
+				  // Message trame MX#Y#Z
+				  x = (data * sin(angle_top + 90.0f) * cos(angle_base + 90.0f)) / 10; // Coordinate X in cm
+				  y = (data * sin(angle_top + 90.0f) * sin(angle_base + 90.0f)) / 10; // Coordinate Y in cm
+				  z = (data * cos(angle_top + 90.0f)) / 10;			       // Coordinate Z in cm
+			  }
+			  else
+			  {
+				  // Not valid measure
+				  x = -1.f;
+				  y = -1.f;
+				  z = -1.f;
+
+				  Status = VL53L0X_ERROR_NONE;
+			  }
+
+			  sprintf(UART_buffer, "M%d#%d#%d\n", (int) x, (int) y, (int) z);
+			  UART2puts(UART_buffer);
+			  DelayMs(5);
+			  break;
+	  	  case INIT:
+	  		  angle_top = angle_top_init;
+	  		  ServoSetPos(SERVO_TOP_ID, angle_top);
+	  		  angle_base = angle_base_init;
+	  		  ServoSetPos(SERVO_BASE_ID, angle_base);
+	  		  state = MEASURING;
+	  		  break;
+	  	  case IDLE:
+	  		  break;
 	  }
   }
 
   return Status;
 
+}
+
+void updateAngles()
+{
+//	angle_top = angle_top + delta_top;
+//	if(abs(angle_top) > 70.0f)
+//	{
+//		delta_top = -delta_top;
+//		angle_top = angle_top + delta_top;
+//	}
+//
+//	angle_base = angle_base + delta_base;
+//	if(abs(angle_base) > 80.0f)
+//	{
+//		delta_base = -delta_base;
+//		angle_base = angle_base + delta_base;
+//	}
+
+	angle_base = angle_base + delta_base;
+	if(abs(angle_base) > 80.0f)
+	{
+		delta_base = - delta_base;
+		angle_base = angle_base + delta_base;
+
+		angle_top = angle_top + delta_top;
+
+		if(abs(angle_top) > 70.f)
+		{
+			delta_top = -delta_top;
+			angle_top = angle_top + delta_top;
+		}
+	}
 }
 
 void initLED()

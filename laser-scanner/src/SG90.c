@@ -13,6 +13,8 @@
 char UART_dbg_buff[100];
 #endif
 
+void initPWM(uint8_t channel);
+
 uint16_t PWM_period = 10000;
 
 void ServoSetPos(const uint8_t id, const float angle)
@@ -81,6 +83,36 @@ void ServosClockEnable()
 void PWMInit()
 {
 
+	initPWM(SERVO_BASE_ID);
+	initPWM(SERVO_TOP_ID);
+
+//	GPIO_InitTypeDef GPIO_InitStructure;
+//	TIM_OCInitTypeDef PWM_Canal_Init;// = {0,};
+//	PWM_Canal_Init.TIM_OCMode = TIM_OCMode_PWM1;
+//	PWM_Canal_Init.TIM_Pulse = 270;
+//	PWM_Canal_Init.TIM_OutputState = TIM_OutputState_Enable;
+//	PWM_Canal_Init.TIM_OCPolarity = TIM_OCPolarity_High;
+//
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+//
+//	RCC_APB2PeriphClockCmd(SERVO1_GPIO_CLK, ENABLE);
+//	GPIO_InitStructure.GPIO_Pin = SERVO1_Pin;
+//	GPIO_Init(SERVO1_GPIO_PORT, &GPIO_InitStructure);
+//
+//	TIM_OC1Init(SERVO_TIMER, &PWM_Canal_Init);
+//	TIM_OC1PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+//
+//	RCC_APB2PeriphClockCmd(SERVO2_GPIO_CLK, ENABLE);
+//	GPIO_InitStructure.GPIO_Pin = SERVO2_Pin;
+//	GPIO_Init(SERVO2_GPIO_PORT, &GPIO_InitStructure);
+//
+//	TIM_OC2Init(SERVO_TIMER, &PWM_Canal_Init);
+//	TIM_OC2PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+}
+
+void initPWM(uint8_t channel)
+{
 	GPIO_InitTypeDef GPIO_InitStructure;
 	TIM_OCInitTypeDef PWM_Canal_Init;// = {0,};
 	PWM_Canal_Init.TIM_OCMode = TIM_OCMode_PWM1;
@@ -90,18 +122,27 @@ void PWMInit()
 
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+	switch(channel)
+	{
+		case SERVO_BASE_ID:
 
-	RCC_APB2PeriphClockCmd(SERVO1_GPIO_CLK, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = SERVO1_Pin;
-	GPIO_Init(SERVO1_GPIO_PORT, &GPIO_InitStructure);
+			RCC_APB2PeriphClockCmd(SERVO1_GPIO_CLK, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = SERVO1_Pin;
+			GPIO_Init(SERVO1_GPIO_PORT, &GPIO_InitStructure);
 
-	TIM_OC1Init(SERVO_TIMER, &PWM_Canal_Init);
-	TIM_OC1PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+			TIM_OC1Init(SERVO_TIMER, &PWM_Canal_Init);
+			TIM_OC1PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+			break;
 
-	RCC_APB2PeriphClockCmd(SERVO2_GPIO_CLK, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = SERVO2_Pin;
-	GPIO_Init(SERVO2_GPIO_PORT, &GPIO_InitStructure);
+		case SERVO_TOP_ID:
 
-	TIM_OC2Init(SERVO_TIMER, &PWM_Canal_Init);
-	TIM_OC2PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+			RCC_APB2PeriphClockCmd(SERVO2_GPIO_CLK, ENABLE);
+			GPIO_InitStructure.GPIO_Pin = SERVO2_Pin;
+			GPIO_Init(SERVO2_GPIO_PORT, &GPIO_InitStructure);
+
+			TIM_OC2Init(SERVO_TIMER, &PWM_Canal_Init);
+			TIM_OC2PreloadConfig(SERVO_TIMER, TIM_OCPreload_Enable);
+			break;
+	}
 }
+
