@@ -51,7 +51,7 @@ SOFTWARE.
 
 
 /* Private typedef */
-typedef enum STATE {IDLE, MEASURING, INIT}state_t;
+typedef enum STATE {IDLE, MEASURING, INIT, FINISHED}state_t;
 
 /* Private define  */
 #define USE_CHRONO
@@ -62,11 +62,13 @@ typedef enum STATE {IDLE, MEASURING, INIT}state_t;
 #define VERSION_REQUIRED_MINOR 0
 #define VERSION_REQUIRED_BUILD 2
 
+#define PI 3.14159265
+
 /* Private macro */
 /* Private variables */
 char UART_buffer[200];
-volatile float angle_base = -90.0f, delta_base = 1.0f, angle_top = -50.0f, delta_top = -2.0f;
-const float angle_base_init = -80.0f, angle_top_init = -70.0f;
+volatile float angle_base, delta_base = 1.0f, angle_top, delta_top = 2.0f;
+const float angle_base_init = -70.0f, angle_top_init = -60.0f;
 state_t state = IDLE;
 
 /* Private function prototypes */
@@ -111,6 +113,8 @@ int main(void)
 
   ServosInit();
   UART2Init(9600, 0);
+  UART2InterruptEnable();
+
   UART2puts("UART2 Initialised..\r\n");
 
   I2CEnablePeriphClock();
@@ -166,9 +170,6 @@ int main(void)
 
 
   /*	Own implementation		*/
-//  UART2puts("Call of VL53L0X_ResetDevice\r\n\t");
-//  Status = VL53L0X_ResetDevice(pMyDevice);
-//  print_pal_error(Status);
 
   UART2puts("Call of VL53L0XInit...\r\n");
   if(Status == VL53L0X_ERROR_NONE)
@@ -183,46 +184,21 @@ int main(void)
   uint16_t data;
   float x, y, z;
 
-  ServoSetPos(SERVO_BASE_ID, 0.0f);
-  ServoSetPos(SERVO_TOP_ID, 0.0f);
-  DelayMs(5);
-
-  state = INIT;
+  state = IDLE;
 
   while(true)
   {
 	  switch(state)
 	  {
 	  	  case MEASURING:
-			  // Set position
-//			  ServoSetPos(SERVO_BASE_ID, angle_base);
-//
-//			  angle_base = angle_base + delta_base;
-//			  if(abs(angle_base) > 70.0f)
-//			  {
-//				  delta_base = -delta_base;
-//				  angle_base = angle_base + delta_base;
-//
-//				  ServoSetPos(SERVO_TOP_ID, angle_top);
-//
-//				  angle_top = angle_top + delta_top;
-//				  if((angle_top < -70.0f) || (angle_top > 50.0f))
-//				  {
-//					  delta_top = -delta_top;
-//					  angle_top = angle_top + delta_top;
-//				  }
-//			  }
 
 	  		  updateAngles();
 	  		  ServoSetPos(SERVO_BASE_ID, angle_base);
-	  		  DelayMs(1);
+//	  		  DelayMs(1);
 	  		  ServoSetPos(SERVO_TOP_ID, angle_top);
 
 //	  		  sprintf(UART_buffer, "top: %f | base: %f\r\n", angle_top, angle_base);
 //			  UART2puts(UART_buffer);
-
-//			  if(angle_top == -70.0f)
-//				  state = IDLE;
 
 			  Status = VL53L0XGetSingleMeasure(pMyDevice, &data);
 //			  data = 1000;
@@ -231,9 +207,12 @@ int main(void)
 			  if(Status == VL53L0X_ERROR_NONE)
 			  {
 				  // Message trame MX#Y#Z
-				  x = (data * sin(angle_top + 90.0f) * cos(angle_base + 90.0f)) / 10; // Coordinate X in cm
-				  y = (data * sin(angle_top + 90.0f) * sin(angle_base + 90.0f)) / 10; // Coordinate Y in cm
-				  z = (data * cos(angle_top + 90.0f)) / 10;			       // Coordinate Z in cm
+				  float angle_top_rad = (angle_top + 90.0f)*(PI/180.0f);
+				  float angle_base_rad = (angle_base + 90.0f)*(PI/180.0f);
+
+				  x = (data * sin(angle_top_rad) * cos(angle_base_rad)) / 10; // Coordinate X in cm
+				  y = (data * sin(angle_top_rad) * sin(angle_base_rad)) / 10; // Coordinate Y in cm
+				  z = (data * cos(angle_top_rad)) / 10;			       // Coordinate Z in cm
 			  }
 			  else
 			  {
@@ -247,7 +226,7 @@ int main(void)
 
 			  sprintf(UART_buffer, "M%d#%d#%d\n", (int) x, (int) y, (int) z);
 			  UART2puts(UART_buffer);
-			  DelayMs(5);
+			  DelayMs(2);
 			  break;
 	  	  case INIT:
 	  		  angle_top = angle_top_init;
@@ -256,7 +235,13 @@ int main(void)
 	  		  ServoSetPos(SERVO_BASE_ID, angle_base);
 	  		  state = MEASURING;
 	  		  break;
+
+	  	  case FINISHED:
+	  		  UART2putc('E');
+	  		  state = IDLE;
+	  		  break;
 	  	  case IDLE:
+	  		  // Do nothing
 	  		  break;
 	  }
   }
@@ -265,22 +250,26 @@ int main(void)
 
 }
 
+void USART2_IRQHandler()
+{
+	if(USART_GetITStatus(USART2, USART_IT_RXNE))
+	{
+		char data = USART2->DR;
+
+		switch(data)
+		{
+			case 's':
+				// Start measuring condition
+				state = INIT;
+				break;
+			default:
+				break;
+		}
+	}
+}
+
 void updateAngles()
 {
-//	angle_top = angle_top + delta_top;
-//	if(abs(angle_top) > 70.0f)
-//	{
-//		delta_top = -delta_top;
-//		angle_top = angle_top + delta_top;
-//	}
-//
-//	angle_base = angle_base + delta_base;
-//	if(abs(angle_base) > 80.0f)
-//	{
-//		delta_base = -delta_base;
-//		angle_base = angle_base + delta_base;
-//	}
-
 	angle_base = angle_base + delta_base;
 	if(abs(angle_base) > 80.0f)
 	{
@@ -289,11 +278,13 @@ void updateAngles()
 
 		angle_top = angle_top + delta_top;
 
-		if(abs(angle_top) > 70.f)
-		{
-			delta_top = -delta_top;
-			angle_top = angle_top + delta_top;
-		}
+//		if(abs(angle_top) > 70.f)
+//		{
+//			delta_top = -delta_top;
+//			angle_top = angle_top + delta_top;
+//		}
+		if(angle_top >= abs(angle_top_init))
+			state = FINISHED; // We've reached the end of the measurement
 	}
 }
 
