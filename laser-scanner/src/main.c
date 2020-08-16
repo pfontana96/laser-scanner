@@ -58,11 +58,14 @@ typedef enum STATE {IDLE, MEASURING, INIT, FINISHED}state_t;
 
 #define NB_OF_MEASURES 5
 
+//#define DEBUG_LOG
+
 #define VERSION_REQUIRED_MAJOR 1
 #define VERSION_REQUIRED_MINOR 0
 #define VERSION_REQUIRED_BUILD 2
 
 #define PI 3.14159265
+
 
 /* Private macro */
 /* Private variables */
@@ -162,16 +165,20 @@ int main(void)
 		  pVersion->minor != VERSION_REQUIRED_MINOR ||
 		  pVersion->build != VERSION_REQUIRED_BUILD )
 	  {
+#ifdef DEBUG_LOG
 		  printf("VL53L0X API Version Error: Your firmware has %d.%d.%d (revision %d). This example requires %d.%d.%d.\r\n",
 			  (int) pVersion->major, (int) pVersion->minor, (int) pVersion->build, (int) pVersion->revision,
 			  VERSION_REQUIRED_MAJOR, VERSION_REQUIRED_MINOR, VERSION_REQUIRED_BUILD);
+#endif
 	  }
   }
 
 
   /*	Own implementation		*/
-
+#ifdef DEBUG_LOG
   UART2puts("Call of VL53L0XInit...\r\n");
+#endif
+
   if(Status == VL53L0X_ERROR_NONE)
   {
 //	  Status = VL53L0XInit(pMyDevice, VL53L0X_DEVICEMODE_CONTINUOUS_RANGING);
@@ -206,13 +213,22 @@ int main(void)
 
 			  if(Status == VL53L0X_ERROR_NONE)
 			  {
+#ifdef DEBUG_LOG
+				  sprintf(UART_buffer, "measure = %d mm\r\n", data);
+				  UART2puts(UART_buffer);
+#endif
+				  if(data == 65535)
+					  data = 1300; // max measurable distance
 				  // Message trame MX#Y#Z
 				  float angle_top_rad = (angle_top + 90.0f)*(PI/180.0f);
 				  float angle_base_rad = (angle_base + 90.0f)*(PI/180.0f);
 
-				  x = (data * sin(angle_top_rad) * cos(angle_base_rad)) / 10; // Coordinate X in cm
-				  y = (data * sin(angle_top_rad) * sin(angle_base_rad)) / 10; // Coordinate Y in cm
-				  z = (data * cos(angle_top_rad)) / 10;			       // Coordinate Z in cm
+				  x = (data * sin(angle_top_rad) * cos(angle_base_rad)) / 10; 	// Coordinate X in cm
+				  y = (data * sin(angle_top_rad) * sin(angle_base_rad)) / 10; 	// Coordinate Y in cm
+				  z = (data * cos(angle_top_rad)) / 10;			       		 	// Coordinate Z in cm
+
+				  sprintf(UART_buffer, "M%d#%d#%d\n", (int) x, (int) y, (int) z);
+				  UART2puts(UART_buffer);
 			  }
 			  else
 			  {
@@ -224,8 +240,6 @@ int main(void)
 				  Status = VL53L0X_ERROR_NONE;
 			  }
 
-			  sprintf(UART_buffer, "M%d#%d#%d\n", (int) x, (int) y, (int) z);
-			  UART2puts(UART_buffer);
 			  DelayMs(2);
 			  break;
 	  	  case INIT:
