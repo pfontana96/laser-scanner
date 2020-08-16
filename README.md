@@ -1,10 +1,10 @@
 # laser-scanner
-3D Laser scanner using ST VL53L0X
+3D Laser scanner using ST VL53L0X sensor
 <p float="left">
   <img src="/laser-scanner/media/scanner-real-1.jpg" width="300">
   <img src="/laser-scanner/media/scanner-real-2.jpg" width="300">
 </p>
-This project is based on the low-cost microcontroller STM32F103 of ST, also known as Blue Pill
+This project is based on the ST low-cost microcontroller STM32F103, also known as Blue Pill
 
 # Working example
 
