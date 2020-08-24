@@ -54,7 +54,7 @@ void UART2GPIOEnable()
 void UART2InterruptEnable()
 {
 	NVIC_InitTypeDef NVIC_init_struct;
-	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // enable the USART1 receive interrupt
+	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // enable the USART2 receive interrupt
 	NVIC_init_struct.NVIC_IRQChannel = USART2_IRQn;		 // we want to configure the USART1 interrupts
 	NVIC_init_struct.NVIC_IRQChannelPreemptionPriority = 0;// this sets the priority group of the USART1 interrupts
 	NVIC_init_struct.NVIC_IRQChannelSubPriority = 0;		 // this sets the subpriority inside the group

@@ -10,6 +10,7 @@
 
 #include "vl53l0x_api.h"
 #include "vl53l0x_platform.h"
+#include <stdbool.h>
 
 #include "STM32F103_UART.h"
 #include "STM32F103_delay.h"
@@ -26,6 +27,9 @@
 										(MODE == VL53L0X_DEVICEMODE_SINGLE_HISTOGRAM ) || (MODE == VL53L0X_DEVICEMODE_GPIO_OSC )  		 \
 										(MODE == VL53L0X_DEVICEMODE_SINGLE_ALS ) || (MODE == VL53L0X_DEVICEMODE_GPIO_DRIVE)  			 \
 										(MODE == VL53L0X_DEVICEMODE_CONTINUOUS_TIMED_RANGING))
+
+/* No range measured (distance further than max tolerable)*/
+#define VL53L0X_ERROR_INVALID_RANGE		((VL53L0X_Error)	-13)
 
 /* Private functions */
 void print_pal_error(VL53L0X_Error Status);
