@@ -54,7 +54,7 @@ SOFTWARE.
 typedef enum STATE {IDLE, MEASURING, INIT, FINISHED}state_t;
 
 /* Private define  */
-#define USE_CHRONO
+//#define CHRONO       // Measure elapsed time in sending measurement (use to calculate sampling rate)
 
 #define NB_OF_MEASURES 5
 
@@ -70,7 +70,7 @@ typedef enum STATE {IDLE, MEASURING, INIT, FINISHED}state_t;
 /* Private macro */
 /* Private variables */
 char UART_buffer[200];
-volatile float angle_base, delta_base = 1.0f, angle_top, delta_top = 2.0f;
+volatile float angle_base, delta_base = 2.0f, angle_top, delta_top = 2.0f;
 const float angle_base_init = -70.0f, angle_top_init = -60.0f;
 state_t state = IDLE;
 
@@ -121,6 +121,8 @@ int main(void)
   UART2puts("UART2 Initialised..\r\n");
 
   I2CEnablePeriphClock();
+
+  UART2puts("I2C Initialised..\r\n");
 
   /*	Official ST API		*/
 
@@ -186,6 +188,10 @@ int main(void)
 	  print_pal_error(Status);
   }
 
+#ifdef CHRONO
+  uint32_t start_t, end_t;
+#endif
+
 //  uint32_t n = NB_OF_MEASURES;
 //  uint16_t measures[n], avg;
   uint16_t data;
@@ -198,6 +204,10 @@ int main(void)
 	  switch(state)
 	  {
 	  	  case MEASURING:
+
+#ifdef CHRONO
+	  		 start_t = getTime_ms();
+#endif
 
 	  		  updateAngles();
 	  		  ServoSetPos(SERVO_BASE_ID, angle_base);
@@ -217,8 +227,9 @@ int main(void)
 				  sprintf(UART_buffer, "measure = %d mm\r\n", data);
 				  UART2puts(UART_buffer);
 #endif
-				  if(data == 65535)
-					  data = 1300; // max measurable distance
+//				  if(data == 65535)
+//					  data = 1300; // max measurable distance
+
 				  // Message trame MX#Y#Z
 				  float angle_top_rad = (angle_top + 90.0f)*(PI/180.0f);
 				  float angle_base_rad = (angle_base + 90.0f)*(PI/180.0f);
@@ -229,20 +240,22 @@ int main(void)
 
 				  sprintf(UART_buffer, "M%d#%d#%d\n", (int) x, (int) y, (int) z);
 				  UART2puts(UART_buffer);
+#ifdef CHRONO
+				  end_t = getTime_ms();
+				  sprintf(UART_buffer, "Elapsed time: %d ms\r\n", (int) (end_t - start_t));
+				  UART2puts(UART_buffer);
+#endif
 			  }
 			  else
 			  {
-				  // Not valid measure
-				  x = -1.f;
-				  y = -1.f;
-				  z = -1.f;
-
 				  Status = VL53L0X_ERROR_NONE;
 			  }
 
-			  DelayMs(2);
+//			  DelayMs(2);
 			  break;
+
 	  	  case INIT:
+
 	  		  angle_top = angle_top_init;
 	  		  ServoSetPos(SERVO_TOP_ID, angle_top);
 	  		  angle_base = angle_base_init;
@@ -251,9 +264,11 @@ int main(void)
 	  		  break;
 
 	  	  case FINISHED:
+
 	  		  UART2putc('E');
 	  		  state = IDLE;
 	  		  break;
+
 	  	  case IDLE:
 	  		  // Do nothing
 	  		  break;
@@ -276,6 +291,14 @@ void USART2_IRQHandler()
 				// Start measuring condition
 				state = INIT;
 				break;
+			case 'p':
+				// Pause measuring condition
+				state = IDLE;
+				break;
+			case 'r':
+				// Reanude condition
+				state = MEASURING;
+				break;
 			default:
 				break;
 		}
@@ -285,18 +308,13 @@ void USART2_IRQHandler()
 void updateAngles()
 {
 	angle_base = angle_base + delta_base;
-	if(abs(angle_base) > 80.0f)
+	if(abs(angle_base) > abs(angle_base_init))
 	{
 		delta_base = - delta_base;
 		angle_base = angle_base + delta_base;
 
 		angle_top = angle_top + delta_top;
 
-//		if(abs(angle_top) > 70.f)
-//		{
-//			delta_top = -delta_top;
-//			angle_top = angle_top + delta_top;
-//		}
 		if(angle_top >= abs(angle_top_init))
 			state = FINISHED; // We've reached the end of the measurement
 	}

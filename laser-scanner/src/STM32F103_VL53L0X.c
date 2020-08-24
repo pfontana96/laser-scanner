@@ -220,6 +220,7 @@ VL53L0X_Error VL53L0XGetSingleMeasure(VL53L0X_Dev_t *pMyDevice, uint16_t *measur
 {
 	VL53L0X_RangingMeasurementData_t RangingMeasurementData;
 	VL53L0X_Error Status = VL53L0X_ERROR_NONE;
+	bool invalid_range = false;
 	char rangeStatusStr[VL53L0X_MAX_STRING_LENGTH];
 
 //	UART2puts ("Call of VL53L0X_StartMeasurement\r\n\t");
@@ -241,7 +242,7 @@ VL53L0X_Error VL53L0XGetSingleMeasure(VL53L0X_Dev_t *pMyDevice, uint16_t *measur
 	   }
 	   else
 	   {
-		   *measure = -1;	// Value for non valid measures
+		   	invalid_range = true;
 	   }
 #ifdef VL53L0X_LOG_INFO
 		VL53L0X_GetRangeStatusString(RangingMeasurementData.RangeStatus, rangeStatusStr);
@@ -267,6 +268,9 @@ VL53L0X_Error VL53L0XGetSingleMeasure(VL53L0X_Dev_t *pMyDevice, uint16_t *measur
 //	print_pal_error(Status);
 
    VL53L0X_PollingDelay(pMyDevice);
+
+   	if(invalid_range && (Status == VL53L0X_ERROR_NONE))
+   		return VL53L0X_ERROR_INVALID_RANGE;
 
 	return Status;
 }

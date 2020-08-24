@@ -7,7 +7,7 @@
 #include "STM32F103_I2C.h"
 #include <stdio.h>
 
-#define I2C_DBG
+//#define I2C_DBG
 
 #ifdef I2C_DBG
 
@@ -46,7 +46,7 @@ void I2CEnablePeriphClock()
 	RCC_APB1PeriphResetCmd(I2Cx_RCC, ENABLE);
 	RCC_APB1PeriphResetCmd(I2Cx_RCC, DISABLE);
 
-	I2C_InitStruct.I2C_ClockSpeed = 400000;
+	I2C_InitStruct.I2C_ClockSpeed = 100000;
 	I2C_InitStruct.I2C_Mode = I2C_Mode_I2C;
 	I2C_InitStruct.I2C_DutyCycle = I2C_DutyCycle_2;
 	I2C_InitStruct.I2C_OwnAddress1 = 0x00;
@@ -65,8 +65,6 @@ void I2CEnablePeriphClock()
 	// Enable ERRORs interrupt
 	I2C_ITConfig(I2Cx, I2C_IT_ERR, ENABLE);
 
-//	DelayInit();
-	UART2puts("I2C Initialised..\r\n");
 }
 
 uint8_t _I2CCheckError()
